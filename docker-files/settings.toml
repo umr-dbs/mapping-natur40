@@ -1,0 +1,14 @@
+[gdalsource.datasets]
+path="/app/gdalsources_description" # The path to the JSON data set descriptions for the GDALSource
+
+[ogrsource.files]
+path="/app/ogrsources_description" # The path to the JSON data set descriptions for the OGRSource
+
+[rasterdb]
+backend="local" # Remote specifies to use a tileserver to fetch raster tiles instead of loading them from disk (local|remote)
+
+[rasterdb.local]
+location="/app/rastersources/" # Specify the location for the local rasterdb to use for storing data.
+
+[operators.r]
+location="tcp:rserver:10200"

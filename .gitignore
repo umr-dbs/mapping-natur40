@@ -1,0 +1,43 @@
+.project
+.cproject
+.settings
+.idea
+*.tmp.*
+_*
+datasources
+*.o
+*.cl.h
+
+# compiled binaries
+mapping/mapping_manager
+mapping/mapping_manager.san
+mapping/r_server
+mapping/gtest
+mapping/tileserver
+mapping/cache_index
+mapping/cache_node
+mapping/cache_experiments
+mapping/cluster_experiment
+mapping/local_setup
+mapping/test_client
+mapping/test/systemtests/parse_logs
+
+# machine specific configuration
+mapping/Makefile.local
+
+# generated documentation
+docs/waveDoc/*
+htdocs/doc/wave/*
+docs/mappingDoc/*
+htdocs/doc/mapping/*
+
+# cmake
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CMakeFiles
+cmake-build-*
+## libraries
+mapping_gfbio.cbp
+libmapping_*
+jsoncpp-*

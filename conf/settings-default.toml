@@ -1,0 +1,13 @@
+[jwt]
+provider_key='''-----BEGIN PUBLIC KEY-----
+FILL IN (after a new line)
+-----END PUBLIC KEY-----'''
+client_key=''''-----BEGIN EC PRIVATE KEY-----
+FILL IN (after a new line)
+-----END EC PRIVATE KEY-----'''
+algorithm="ES512"
+allowed_clock_skew_seconds=10
+redirect_token=""
+
+[natur40]
+rasterdb_url=""

@@ -1,0 +1,38 @@
+language: cpp
+dist: trusty
+sudo: required
+
+services:
+  - docker
+
+addons:
+  apt:
+    packages:
+      - docker-ce
+
+script:
+  - export TAG=`
+      if [[ $TRAVIS_PULL_REQUEST == "false" ]] && [[ $TRAVIS_BRANCH == "master" ]]; then
+        echo "dev";
+      elif [[ $TRAVIS_PULL_REQUEST == "true" ]]; then
+        echo $TRAVIS_PULL_REQUEST_BRANCH;
+      else
+        echo $TRAVIS_BRANCH;
+      fi`
+  - docker build --tag $REPO:$TAG --file Dockerfile .
+  # TODO: add test
+  # docker run -t $REPO:$TAG make test
+
+after_success:
+  - echo "$DOCKER_PASS" | docker login --username "$DOCKER_USER" --password-stdin
+  - if [[ $TRAVIS_PULL_REQUEST == "false" ]]; then
+      docker push $REPO:$TAG;
+    fi
+
+env:
+  global:
+  - REPO="umrdbs/mapping-natur40"
+    # $DOCKER_USER
+  - secure: "Wam6pfgbQmDCVX1LY7dtaVlpjghyVmJd7+xEzgtPaqqcQE/iAEB65FBN35+l84HE5V5PQiw73YUxpWH4Wj8cblBHp1JKFYxsJLCj8bRva8SJGtDjxDXrdCXC/bI71WWD5nhNXj9c2cMARXzMNgxdc4v1arQ/Dy2dgl2pslqKvLK2eOJT0cOaDQhrUSPVBETvi+SZBBWUnMLGcdcjWYP5vkfFa5HpBE3IHjyzCrvwuI91Dj+z5wKxMok0QSniQwFOdsZPYdXQWn4duMJug+xFTUajCA02Yjo6TPhRwBWNb1ju3etxDD5pcla+vU9ldIFG+40Hog+oegmjn+DUSJMcgpg1eKwITUWji+vIotO/M/9sx7E2uC8oswytQjM/Yj+6KbOqQR9cVwJCXsEcThdjCDtutbLfDzVG96RFmbLLgMI/RFQNQpPMKO9+J6yUkzgZQvDqFgghLTayzM43UV8swpCV5z7cZ7Jl38wYrmndsGYI8RSQZZ1aNN5HVZM0yYZ0srs+vQvXOwl/JpF6OTIou7RxdiPRXYRV/u3R5OdbDXZ8KRnUc8CxLfYQzMaDzmkCLkQK8fchfE+H4Tz4UNFzK5RqrYLbtuH4IokjrfX6IaM4nOsgymXZ6u6R2xRYc1cp/fRqFkfZnB0Xvfzh9FoEGkyhrRMEnBUMMQe0g9lgu3A="
+    # $DOCKER_PASS
+  - secure: "boF4UO6wcq+nyEYwk48xj6GencGqMoJV1R4q7hvjLtRilGSNbP5u+VbGOejJSluVAIaSgo3KGt+05iI5LtHL6ZWT3B11kKh2+Ana1xADQqJ4U9g467sjwagPpBrZsTX/eD2AwakpETiooaQ2Zc6oO1oergHW/FGNTLy5Zj+eczLG+pibzlqPcwyqpiR2yMh0s40LZjd5CdORSGbsmrXZgI1f3xmsJL7vD3pPqn4lJ3ea+AZLng3vdyUkedUfzNvyowanvdD21INptnz5QcAMOo45Dr+EQPhaudYYRNDHZKEP/24g2Qe2Y+yET+fN9lYn6NrmMMiFOE0mIy77OYjvxpuLKuKaybkHOhYfJZM7GOwwNdpO9QU3cJclv+odTAI+18VvxckOWMuPxonrjMnKPr7mJlF+WBV7VMZUeYVFAif3fs8su2B/l7DkkjvPiYuWawODQj15p5qZVJIb7GhnhsKDxewUr36+PYTQSaG4hojPH8Ag+AzYPUDl4SCvu0Cxwp3zIwWtdKBV+JdGI5mzp1sL9YwxySXS9mGjA0/zDD49hhGMeKZvTUu5fubrPS6d55yQv5JoNVupEGuGj7FKQyibdC9CbaedN/tW8cRy2Z/kMnKOe7n5M13HBIBtPL/xvIKBJfUlKThdMjYJxuR31Mzqy2wfLLFRaCk2QMM70d0="
