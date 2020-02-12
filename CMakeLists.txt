@@ -33,6 +33,26 @@ include(LinkLibrariesInternal)
 # Dependencies
 include(DownloadProject)
 
+if (NOT is_mapping_module)
+    # Disable options from cpptoml
+    option(ENABLE_LIBCXX "Use libc++ for the C++ standard library" OFF)
+    option(CPPTOML_BUILD_EXAMPLES "Build examples" OFF)
+
+    download_project(PROJ jsoncpp
+            GIT_REPOSITORY https://github.com/open-source-parsers/jsoncpp.git
+            GIT_TAG 1.7.7
+            UPDATE_DISCONNECTED 1
+            )
+    add_subdirectory(${jsoncpp_SOURCE_DIR} ${jsoncpp_BINARY_DIR} EXCLUDE_FROM_ALL)
+    download_project(PROJ       cpptoml
+            GIT_REPOSITORY      https://github.com/skystrife/cpptoml.git
+            GIT_TAG             master
+            UPDATE_DISCONNECTED 1
+            PREFIX CMakeFiles/Download
+            )
+    add_subdirectory(${cpptoml_SOURCE_DIR} ${cpptoml_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif (NOT is_mapping_module)
+
 download_project(PROJ       cpp-jwt
         GIT_REPOSITORY      https://github.com/michaelmattig/cpp-jwt.git
         GIT_TAG             master
