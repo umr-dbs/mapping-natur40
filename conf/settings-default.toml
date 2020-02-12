@@ -11,3 +11,5 @@ redirect_token=""
 
 [natur40]
 rasterdb_url=""
+catalog_url=""
+catalog_auth_url=""

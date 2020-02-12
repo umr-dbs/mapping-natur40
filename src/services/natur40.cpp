@@ -5,6 +5,7 @@
 #include <util/curl.h>
 
 #include <jwt/jwt.hpp>
+#include <utility>
 
 /*
  * This class provides methods for Natur 4.0 users
@@ -23,12 +24,96 @@ public:
     ~Natur40Service() override = default;
 
 private:
+    class CatalogEntry {
+    public:
+        std::string id, name, description, url;
+
+        CatalogEntry(std::string id, std::string name, std::string description, std::string url) :
+                id(std::move(id)), name(std::move(name)), description(std::move(description)), url(std::move(url)) {}
+
+        auto toJson() const -> Json::Value;
+    };
+
     static constexpr const char *EXTERNAL_ID_PREFIX = "JWT:";
 
     void run() override;
+
+    auto queryCatalog(const std::string &token) -> std::vector<CatalogEntry>;
+
+    auto createCatalogSession(const std::string &token) const -> std::string;
+
+    auto getCatalogJSON(const std::string &sessionId) const -> Json::Value;
 };
 
+auto Natur40Service::CatalogEntry::toJson() const -> Json::Value {
+    Json::Value v(Json::ValueType::objectValue);
+    v["id"] = id;
+    v["name"] = name;
+    v["description"] = description;
+    v["url"] = url;
+    return v;
+}
+
 REGISTER_HTTP_SERVICE(Natur40Service, "natur40");
+
+
+auto Natur40Service::createCatalogSession(const std::string &token) const -> std::string {
+    cURL curl;
+    std::stringstream data;
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
+
+    curl.setOpt(CURLOPT_URL, concat(Configuration::get<std::string>("natur40.catalog_auth_url"), token).c_str());
+    curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+    curl.setOpt(CURLOPT_WRITEDATA, &data);
+    curl.setOpt(CURLOPT_COOKIEFILE, "");
+    curl.perform();
+
+
+    const std::vector<std::string> vector = curl.getCookies();
+
+    if (vector.empty()) {
+        throw NetworkException("Natur40 Catalog Cookie missing");
+    }
+
+    std::string cookie = vector[0];
+    return cookie.substr(cookie.rfind('\t') + 1);
+}
+
+auto Natur40Service::getCatalogJSON(const std::string &sessionId) const -> Json::Value {
+    cURL curl;
+    std::stringstream data;
+
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
+
+    curl.setOpt(CURLOPT_URL, Configuration::get<std::string>("natur40.catalog_url").c_str());
+    curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+    curl.setOpt(CURLOPT_COOKIE, concat("session=", sessionId, ";").c_str());
+    curl.setOpt(CURLOPT_WRITEDATA, &data);
+    curl.setOpt(CURLOPT_COOKIEFILE, "");
+    curl.perform();
+
+    Json::Reader reader(Json::Features::strictMode());
+    Json::Value entities;
+    if (!reader.parse(data.str(), entities))
+        throw std::runtime_error("Could not parse from Natur40 calatog");
+
+    return entities;
+}
+
+auto Natur40Service::queryCatalog(const std::string &token) -> std::vector<CatalogEntry> {
+    Json::Value json = getCatalogJSON(createCatalogSession(token));
+
+    std::vector<CatalogEntry> entries;
+
+    for (const Json::Value &v : json.get("entities", Json::Value(Json::ValueType::arrayValue))) {
+        entries.emplace_back(v.get("id", "").asString(),
+                             v.get("name", "").asString(),
+                             v.get("desc", "").asString(),
+                             v.get("url", "").asString());
+    }
+
+    return entries;
+}
 
 void Natur40Service::run() {
     try {
@@ -96,102 +181,19 @@ void Natur40Service::run() {
         auto user = session->getUser();
 
         if (params.get("request") == "sourcelist") {
-            Json::Value v(Json::ValueType::objectValue);
+            Json::Value result(Json::ValueType::arrayValue);
             try {
                 std::string jwt = user.loadArtifact(user.getUsername(), "jwt",
                                                     "token")->getLatestArtifactVersion()->getValue();
+                std::vector<CatalogEntry> entries = queryCatalog(jwt);
 
-                std::string rasterDBUrl = Configuration::get<std::string>("natur40.rasterdb_url", "");
-
-                cURL curl;
-                std::stringstream data;
-                curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
-
-                curl.setOpt(CURLOPT_URL, concat(rasterDBUrl, "/rasterdbs.json?bands&code&JWS=", jwt).c_str());
-                curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
-                curl.setOpt(CURLOPT_WRITEDATA, &data);
-                curl.perform();
-
-                Json::Reader reader(Json::Features::strictMode());
-                Json::Value rasters;
-                if (!reader.parse(data.str(), rasters))
-                    throw std::runtime_error("Could not parse rasters from Natur40 rasterdb");
-
-                for (auto &raster : rasters["rasterdbs"]) {
-                    bool vatTag = false;
-                    for (auto &tag : raster["tags"]) {
-                        if (tag.asString() == "vat") {
-                            vatTag = true;
-                            break;
-                        }
-                    }
-
-                    if (!vatTag) {
-                        continue;
-                    }
-
-                    Json::Value source(Json::objectValue);
-
-                    std::string sourceName = raster["name"].asString();
-
-                    Json::Value channels(Json::arrayValue);
-
-                    std::string crs = raster["code"].asString();
-                    std::string epsg = crs.substr(5);
-
-                    Json::Value coords(Json::objectValue);
-                    coords["crs"] = crs;
-                    coords["epsg"] = epsg;
-
-                    source["coords"] = coords;
-
-
-                    for (auto &band : raster["bands"]) {
-                        Json::Value channel(Json::objectValue);
-
-                        channel["name"] = band["title"];
-                        channel["datatype"] = band["datatype"];
-
-                        channel["file_name"] = concat(rasterDBUrl, "/rasterdb/",
-                                                      sourceName,
-                                                      "/raster.tiff?band=",
-                                                      band["index"].asInt(),
-                                                      "&ext=%%%MINX%%%%20%%%MINY%%%%20%%%MAXX%%%%20%%%MAXY%%%",
-                                                      "&width=%%%WIDTH%%%&height=%%%HEIGHT%%%"
-                                                      "&JWS=%%%JWT%%%&clipped");
-
-                        user.addPermission(concat("data.gdal_source.", channel["file_name"].asString()));
-
-                        channel["channel"] = 1;
-
-                        Json::Value unit(Json::objectValue);
-                        unit["unit"] = "unknown";
-                        unit["interpolation"] = "continuous";
-                        unit["measurement"] = "unknown";
-                        unit["min"] = band["vis_min"];
-                        unit["max"] = band["vis_max"];
-
-                        channel["unit"] = unit;
-
-                        channels.append(channel);
-                    }
-
-                    source["channels"] = channels;
-
-                    source["operator"] = "gdal_ext_source";
-
-                    Json::Value tags(Json::arrayValue);
-                    tags.append("natur40");
-
-                    source["tags"] = tags;
-
-                    v[sourceName] = source;
+                for (const CatalogEntry &e : entries) {
+                    const Json::Value value = e.toJson();
+                    result.append(value);
                 }
-
-
             } catch (UserDB::artifact_error &) {}
 
-            response.sendSuccessJSON("sourcelist", v);
+            response.sendSuccessJSON("sourcelist", result);
             return;
         }
     }
