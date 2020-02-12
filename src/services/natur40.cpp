@@ -20,15 +20,15 @@ class Natur40Service : public HTTPService {
 public:
     using HTTPService::HTTPService;
 
-    virtual ~Natur40Service() = default;
+    ~Natur40Service() override = default;
 
 private:
-    static constexpr const char* EXTERNAL_ID_PREFIX = "JWT:";
-    virtual void run();
+    static constexpr const char *EXTERNAL_ID_PREFIX = "JWT:";
+
+    void run() override;
 };
 
-REGISTER_HTTP_SERVICE(Natur40Service,
-"natur40");
+REGISTER_HTTP_SERVICE(Natur40Service, "natur40");
 
 void Natur40Service::run() {
     try {
@@ -47,7 +47,7 @@ void Natur40Service::run() {
 
             std::string externalId = EXTERNAL_ID_PREFIX + payload.get_claim_value<std::string>("sub");
 
-            std::shared_ptr <UserDB::Session> session;
+            std::shared_ptr<UserDB::Session> session;
             try {
                 // create session for user if he already exists
                 session = UserDB::createSessionForExternalUser(externalId, 8 * 3600);
@@ -79,7 +79,7 @@ void Natur40Service::run() {
 
         if (params.get("request") == "clientToken") {
             std::string clientToken = Configuration::get<std::string>("jwt.redirect_token", "");
-            if (clientToken != "") {
+            if (!clientToken.empty()) {
                 response.sendSuccessJSON("clientToken", clientToken);
             } else {
                 jwt::jwt_object obj{jwt::params::algorithm({Configuration::get<std::string>("jwt.algorithm")}),
