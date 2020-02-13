@@ -17,11 +17,11 @@
  *      - parameters
  *          - sessiontoken: Requires the user to be logged in
  */
-class Natur40Service : public HTTPService {
+class Nature40Service : public HTTPService {
     public:
         using HTTPService::HTTPService;
 
-        ~Natur40Service() override = default;
+        ~Nature40Service() override = default;
 
     private:
         class CatalogEntry {
@@ -63,9 +63,9 @@ class Natur40Service : public HTTPService {
         auto getCatalogJSON(const std::string &sessionId) const -> Json::Value;
 };
 
-REGISTER_HTTP_SERVICE(Natur40Service, "natur40"); // NOLINT(cert-err58-cpp)
+REGISTER_HTTP_SERVICE(Nature40Service, "nature40"); // NOLINT(cert-err58-cpp)
 
-void Natur40Service::run() {
+void Nature40Service::run() {
     try {
         if (params.get("request") == "login") {
             auto dec_obj = jwt::decode(params.get("token"),
@@ -153,7 +153,7 @@ void Natur40Service::run() {
 
 }
 
-auto Natur40Service::CatalogEntry::toJson() const -> Json::Value {
+auto Nature40Service::CatalogEntry::toJson() const -> Json::Value {
     Json::Value v(Json::ValueType::objectValue);
     v["global_id"] = global_id;
     v["title"] = title;
@@ -165,12 +165,12 @@ auto Natur40Service::CatalogEntry::toJson() const -> Json::Value {
     return v;
 }
 
-auto Natur40Service::createCatalogSession(const std::string &token) const -> std::string {
+auto Nature40Service::createCatalogSession(const std::string &token) const -> std::string {
     cURL curl;
     std::stringstream data;
     curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 
-    curl.setOpt(CURLOPT_URL, concat(Configuration::get<std::string>("natur40.catalog_auth_url"), token).c_str());
+    curl.setOpt(CURLOPT_URL, concat(Configuration::get<std::string>("nature40.catalog_auth_url"), token).c_str());
     curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
     curl.setOpt(CURLOPT_WRITEDATA, &data);
     curl.setOpt(CURLOPT_COOKIEFILE, "");
@@ -179,20 +179,20 @@ auto Natur40Service::createCatalogSession(const std::string &token) const -> std
     const std::vector<std::string> vector = curl.getCookies();
 
     if (vector.empty()) {
-        throw NetworkException("Natur40 Catalog Cookie missing");
+        throw NetworkException("Nature 4.0 Catalog Cookie missing");
     }
 
     std::string cookie = vector[0];
     return cookie.substr(cookie.rfind('\t') + 1);
 }
 
-auto Natur40Service::getCatalogJSON(const std::string &sessionId) const -> Json::Value {
+auto Nature40Service::getCatalogJSON(const std::string &sessionId) const -> Json::Value {
     cURL curl;
     std::stringstream data;
 
     curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 
-    curl.setOpt(CURLOPT_URL, Configuration::get<std::string>("natur40.catalog_url").c_str());
+    curl.setOpt(CURLOPT_URL, Configuration::get<std::string>("nature40.catalog_url").c_str());
     curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
     curl.setOpt(CURLOPT_COOKIE, concat("session=", sessionId, ";").c_str());
     curl.setOpt(CURLOPT_WRITEDATA, &data);
@@ -202,12 +202,12 @@ auto Natur40Service::getCatalogJSON(const std::string &sessionId) const -> Json:
     Json::Reader reader(Json::Features::strictMode());
     Json::Value entities;
     if (!reader.parse(data.str(), entities))
-        throw std::runtime_error("Could not parse from Natur40 calatog");
+        throw std::runtime_error("Could not parse from Nature 4.0 catalog");
 
     return entities;
 }
 
-auto Natur40Service::queryCatalog(const std::string &token) -> std::vector<CatalogEntry> {
+auto Nature40Service::queryCatalog(const std::string &token) -> std::vector<CatalogEntry> {
     Json::Value json = getCatalogJSON(createCatalogSession(token));
 
     std::vector<CatalogEntry> entries;
