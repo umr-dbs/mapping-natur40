@@ -160,6 +160,18 @@ auto Nature40Service::CatalogEntry::toJson() const -> Json::Value {
     v["description"] = description;
     v["user_url"] = user_url;
 
+    Json::Value provider (Json::ValueType::objectValue);
+    provider["type"] = provider_type;
+    provider["id"] = provider_id;
+    provider["url"] = provider_url;
+    v["provider"] = provider;
+
+    Json::Value dataset (Json::ValueType::objectValue);
+    dataset["type"] = dataset_type;
+    dataset["id"] = dataset_id;
+    dataset["url"] = dataset_url;
+    v["dataset"] = dataset;
+
     // TODO: add parameters that make the data instantiable for the frontend
 
     return v;
