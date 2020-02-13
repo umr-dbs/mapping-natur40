@@ -1,5 +1,5 @@
 # Project
-project(mapping_natur40
+project(mapping_nature40
         LANGUAGES CXX
         )
 
@@ -70,15 +70,15 @@ add_subdirectory(test)
 
 # Add libraries for inlcuding them in the core build process
 if (is_mapping_module)
-    #set(MAPPING_ADD_TO_BASE_OBJECTS ${MAPPING_ADD_TO_BASE_OBJECTS} mapping_natur40_base_lib PARENT_SCOPE)
+    #set(MAPPING_ADD_TO_BASE_OBJECTS ${MAPPING_ADD_TO_BASE_OBJECTS} mapping_nature40_base_lib PARENT_SCOPE)
 
-    #set(MAPPING_ADD_TO_OPERATORS_OBJECTS ${MAPPING_ADD_TO_OPERATORS_OBJECTS} mapping_natur40_operators_lib PARENT_SCOPE)
+    #set(MAPPING_ADD_TO_OPERATORS_OBJECTS ${MAPPING_ADD_TO_OPERATORS_OBJECTS} mapping_nature40_operators_lib PARENT_SCOPE)
 
     set(MAPPING_ADD_TO_SERVICES_LIBRARIES ${MAPPING_ADD_TO_OPERATORS_LIBRARIES} ${OPENSSL_LIBRARIES} PARENT_SCOPE)
 
-    set(MAPPING_ADD_TO_SERVICES_OBJECTS ${MAPPING_ADD_TO_SERVICES_OBJECTS} mapping_natur40_services_lib PARENT_SCOPE)
+    set(MAPPING_ADD_TO_SERVICES_OBJECTS ${MAPPING_ADD_TO_SERVICES_OBJECTS} mapping_nature40_services_lib PARENT_SCOPE)
 
-    #set(MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL ${MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL} mapping_natur40_unittests_lib PARENT_SCOPE)
-    #set(SYSTEMTESTS_mapping-natur40_INTERNAL ${systemtests} PARENT_SCOPE)
+    #set(MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL ${MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL} mapping_nature40_unittests_lib PARENT_SCOPE)
+    #set(SYSTEMTESTS_mapping-nature40_INTERNAL ${systemtests} PARENT_SCOPE)
 
 endif (is_mapping_module)

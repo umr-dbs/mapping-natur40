@@ -31,7 +31,7 @@ after_success:
 
 env:
   global:
-  - REPO="umrdbs/mapping-natur40"
+  - REPO="umrdbs/mapping-nature40"
     # $DOCKER_USER
   - secure: "Wam6pfgbQmDCVX1LY7dtaVlpjghyVmJd7+xEzgtPaqqcQE/iAEB65FBN35+l84HE5V5PQiw73YUxpWH4Wj8cblBHp1JKFYxsJLCj8bRva8SJGtDjxDXrdCXC/bI71WWD5nhNXj9c2cMARXzMNgxdc4v1arQ/Dy2dgl2pslqKvLK2eOJT0cOaDQhrUSPVBETvi+SZBBWUnMLGcdcjWYP5vkfFa5HpBE3IHjyzCrvwuI91Dj+z5wKxMok0QSniQwFOdsZPYdXQWn4duMJug+xFTUajCA02Yjo6TPhRwBWNb1ju3etxDD5pcla+vU9ldIFG+40Hog+oegmjn+DUSJMcgpg1eKwITUWji+vIotO/M/9sx7E2uC8oswytQjM/Yj+6KbOqQR9cVwJCXsEcThdjCDtutbLfDzVG96RFmbLLgMI/RFQNQpPMKO9+J6yUkzgZQvDqFgghLTayzM43UV8swpCV5z7cZ7Jl38wYrmndsGYI8RSQZZ1aNN5HVZM0yYZ0srs+vQvXOwl/JpF6OTIou7RxdiPRXYRV/u3R5OdbDXZ8KRnUc8CxLfYQzMaDzmkCLkQK8fchfE+H4Tz4UNFzK5RqrYLbtuH4IokjrfX6IaM4nOsgymXZ6u6R2xRYc1cp/fRqFkfZnB0Xvfzh9FoEGkyhrRMEnBUMMQe0g9lgu3A="
     # $DOCKER_PASS
