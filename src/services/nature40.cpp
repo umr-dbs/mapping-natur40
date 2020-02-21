@@ -52,6 +52,20 @@ class Nature40Service : public HTTPService {
                 auto toJson() const -> Json::Value;
         };
 
+        class CatalogEntryMetadata {
+            public:
+
+                CatalogEntryMetadata(std::string type, Json::Value metadata) : type(std::move(type)), metadata(std::move(metadata)) {
+                    this->metadata["type"] = this->type; // attach type to metadata
+                }
+
+                auto toJson() const -> Json::Value;
+
+            private:
+                std::string type;
+                Json::Value metadata;
+        };
+
         static constexpr const char *EXTERNAL_ID_PREFIX = "JWT:";
 
         void run() override;
@@ -61,6 +75,14 @@ class Nature40Service : public HTTPService {
         auto createCatalogSession(const std::string &token) const -> std::string;
 
         auto getCatalogJSON(const std::string &sessionId) const -> Json::Value;
+
+        auto resolveCatalogEntry(UserDB::User &user) const -> Json::Value;
+
+        auto getParamAsJson(const std::string &name) const -> Json::Value;
+
+        auto getRSDBRasterMetadata(const std::string &url, const std::string &json_web_token) const -> Json::Value;
+
+        auto composeRSDBRasterMetadata(UserDB::User &user, const CatalogEntry &entry, const Json::Value &metadata) const -> Json::Value;
 };
 
 REGISTER_HTTP_SERVICE(Nature40Service, "nature40"); // NOLINT(cert-err58-cpp)
@@ -146,6 +168,11 @@ void Nature40Service::run() {
             response.sendSuccessJSON("sourcelist", result);
             return;
         }
+
+        if (params.get("request") == "resolveCatalogEntry") {
+            auto result = resolveCatalogEntry(user);
+            response.sendSuccessJSON(result);
+        }
     }
     catch (const std::exception &e) {
         response.sendFailureJSON(e.what());
@@ -160,13 +187,13 @@ auto Nature40Service::CatalogEntry::toJson() const -> Json::Value {
     v["description"] = description;
     v["user_url"] = user_url;
 
-    Json::Value provider (Json::ValueType::objectValue);
+    Json::Value provider(Json::ValueType::objectValue);
     provider["type"] = provider_type;
     provider["id"] = provider_id;
     provider["url"] = provider_url;
     v["provider"] = provider;
 
-    Json::Value dataset (Json::ValueType::objectValue);
+    Json::Value dataset(Json::ValueType::objectValue);
     dataset["type"] = dataset_type;
     dataset["id"] = dataset_id;
     dataset["url"] = dataset_url;
@@ -229,4 +256,113 @@ auto Nature40Service::queryCatalog(const std::string &token) -> std::vector<Cata
     }
 
     return entries;
+}
+
+auto Nature40Service::getParamAsJson(const std::string &name) const -> Json::Value {
+    std::string json_string = this->params.get(name);
+
+    Json::Reader reader(Json::Features::strictMode());
+    Json::Value value;
+
+    if (!reader.parse(json_string, value)) {
+        throw ArgumentException("Could not parse JSON value");
+    }
+
+    return value;
+}
+
+auto Nature40Service::resolveCatalogEntry(UserDB::User &user) const -> Json::Value {
+    auto json_web_token = user.loadArtifact(user.getUsername(), "jwt", "token")->getLatestArtifactVersion()->getValue();
+    auto entry = CatalogEntry(getParamAsJson("entry"));
+
+    const auto UNKNOWN = []() {
+        Json::Value error(Json::objectValue);
+        error["result"] = false;
+        return error;
+    };
+
+    if (entry.provider_type == "RSDB") {
+        if (entry.dataset_type == "raster") {
+            CatalogEntryMetadata metadata("gdal_source",
+                                          composeRSDBRasterMetadata(
+                                                  user,
+                                                  entry,
+                                                  getRSDBRasterMetadata(entry.dataset_url, json_web_token)
+                                          ));
+            return metadata.toJson();
+        } else {
+            return UNKNOWN();
+        }
+    } else {
+        return UNKNOWN();
+    }
+}
+
+auto Nature40Service::CatalogEntryMetadata::toJson() const -> Json::Value {
+    Json::Value result(Json::objectValue);
+    result["result"] = true;
+    result["metadata"] = metadata;
+    return result;
+}
+
+auto Nature40Service::getRSDBRasterMetadata(const std::string &url, const std::string &json_web_token) const -> Json::Value {
+    auto query = concat(url, "/meta.json?jws=", json_web_token);
+
+    cURL curl;
+    std::stringstream data;
+
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
+    curl.setOpt(CURLOPT_URL, query.c_str());
+    curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+    curl.setOpt(CURLOPT_WRITEDATA, &data);
+    curl.setOpt(CURLOPT_FOLLOWLOCATION, 1L); // server sends 302 to data with cookie session
+    curl.setOpt(CURLOPT_COOKIEFILE, ""); // forwards cookie to final request
+    curl.perform();
+
+    std::string json = data.str();
+
+    Json::Reader reader(Json::Features::strictMode());
+    Json::Value metadata;
+    if (!reader.parse(json, metadata))
+        throw std::runtime_error("Could not parse from RSDB Raster Metadata file");
+
+    return metadata;
+}
+
+auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const CatalogEntry &entry, const Json::Value &metadata) const -> Json::Value {
+    Json::Value result(Json::objectValue);
+
+    std::string crs = metadata.get("ref", Json::objectValue).get("code", "").asString();
+
+    Json::Value channels(Json::arrayValue);
+    for (const auto &band : metadata.get("bands", Json::arrayValue)) {
+        Json::Value channel(Json::objectValue);
+
+        channel["name"] = band["title"];
+        channel["datatype"] = band["datatype"];
+        channel["crs"] = crs;
+
+        channel["file_name"] = concat(entry.dataset_url,
+                                      "/raster.tiff?band=",
+                                      band["index"].asInt(),
+                                      "&ext=%%%MINX%%%%20%%%MINY%%%%20%%%MAXX%%%%20%%%MAXY%%%",
+                                      "&width=%%%WIDTH%%%&height=%%%HEIGHT%%%"
+                                      "&JWS=%%%jwt:token%%%&clipped");
+
+        // ugly hack to allow querying this raster
+        user.addPermission(concat("data.gdal_source.", channel["file_name"].asString()));
+
+        channel["channel"] = 1; // each tiff only has one band
+
+        Unit mapping_unit = Unit::unknown();
+        mapping_unit.setInterpolation(Unit::Interpolation::Continuous);
+        mapping_unit.setMinMax(band["vis_min"].asInt(), band["vis_max"].asInt());
+        channel["unit"] = mapping_unit.toJsonObject();
+
+        channels.append(channel);
+    }
+
+    result["channels"] = channels;
+
+    return result;
 }
