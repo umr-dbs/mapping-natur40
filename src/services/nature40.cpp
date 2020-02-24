@@ -342,11 +342,12 @@ auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const Catalo
         channel["datatype"] = band["datatype"];
         channel["crs"] = crs;
 
-        channel["file_name"] = concat(entry.dataset_url,
+        channel["file_name"] = concat("/vsicurl/", // required for GDAL remote driver
+                                      entry.dataset_url,
                                       "/raster.tiff?band=",
                                       band["index"].asInt(),
                                       "&ext=%%%MINX%%%%20%%%MINY%%%%20%%%MAXX%%%%20%%%MAXY%%%",
-                                      "&width=%%%WIDTH%%%&height=%%%HEIGHT%%%"
+                                      "&width=%%%XRES%%%&height=%%%YRES%%%"
                                       "&JWS=%%%jwt:token%%%&clipped");
 
         // ugly hack to allow querying this raster
