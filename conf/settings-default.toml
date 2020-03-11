@@ -1,3 +1,6 @@
+[gdal_source]
+injectable_user_artifacts=["jwt:token"]
+
 [jwt]
 provider_key='''-----BEGIN PUBLIC KEY-----
 FILL IN (after a new line)
