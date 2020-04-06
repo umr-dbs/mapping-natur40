@@ -83,6 +83,11 @@ class Nature40Service : public HTTPService {
         auto getRSDBRasterMetadata(const std::string &url, const std::string &json_web_token) const -> Json::Value;
 
         auto composeRSDBRasterMetadata(UserDB::User &user, const CatalogEntry &entry, const Json::Value &metadata) const -> Json::Value;
+
+        auto getRSDBVectorMetadata(const std::string &url, const std::string &json_web_token) const -> Json::Value;
+
+        auto composeRSDBVectorMetadata(UserDB::User &user, const CatalogEntry &entry, const Json::Value &metadata,
+                                       const std::string &json_web_token) const -> Json::Value;
 };
 
 REGISTER_HTTP_SERVICE(Nature40Service, "nature40"); // NOLINT(cert-err58-cpp)
@@ -290,6 +295,15 @@ auto Nature40Service::resolveCatalogEntry(UserDB::User &user) const -> Json::Val
                                                   getRSDBRasterMetadata(entry.dataset_url, json_web_token)
                                           ));
             return metadata.toJson();
+        } else if (entry.dataset_type == "vector") {
+            CatalogEntryMetadata metadata("ogr_source",
+                                          composeRSDBVectorMetadata(
+                                                  user,
+                                                  entry,
+                                                  getRSDBVectorMetadata(entry.dataset_url, json_web_token),
+                                                  json_web_token
+                                          ));
+            return metadata.toJson();
         } else {
             return UNKNOWN();
         }
@@ -329,7 +343,8 @@ auto Nature40Service::getRSDBRasterMetadata(const std::string &url, const std::s
     return metadata;
 }
 
-auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const CatalogEntry &entry, const Json::Value &metadata) const -> Json::Value {
+auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const CatalogEntry &entry,
+                                                const Json::Value &metadata) const -> Json::Value {
     Json::Value result(Json::objectValue);
 
     std::string crs = metadata.get("ref", Json::objectValue).get("code", "").asString();
@@ -364,6 +379,60 @@ auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const Catalo
     }
 
     result["channels"] = channels;
+
+    return result;
+}
+
+auto Nature40Service::getRSDBVectorMetadata(const std::string &url, const std::string &json_web_token) const -> Json::Value {
+    auto query = concat(url, "?jws=", json_web_token);
+
+    cURL curl;
+    std::stringstream data;
+
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
+    curl.setOpt(CURLOPT_URL, query.c_str());
+    curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+    curl.setOpt(CURLOPT_WRITEDATA, &data);
+    curl.setOpt(CURLOPT_FOLLOWLOCATION, 1L); // server sends 302 to data with cookie session
+    curl.setOpt(CURLOPT_COOKIEFILE, ""); // forwards cookie to final request
+    curl.perform();
+
+    std::string json = data.str();
+
+    Json::Reader reader(Json::Features::strictMode());
+    Json::Value metadata;
+    if (!reader.parse(json, metadata))
+        throw std::runtime_error("Could not parse from RSDB Raster Metadata file");
+
+    return metadata;
+}
+
+auto Nature40Service::composeRSDBVectorMetadata(UserDB::User &user,
+                                                const Nature40Service::CatalogEntry &entry,
+                                                const Json::Value &metadata,
+                                                const std::string &json_web_token) const -> Json::Value {
+    const Json::Value metadata_details = metadata.get("vectordb", Json::objectValue).get("details", Json::objectValue);
+
+    // TODO: read epsg from metadata when OgrSource supports it
+    // std::string epgs = metadata.get("details", Json::objectValue).get("epsg", "").asString();
+    // std::string crs = concat("EPSG:", epgs.empty() ? "4326" : epgs);
+
+    Json::Value ogr_source(Json::objectValue);
+    ogr_source["operatorType"] = "ogr_source"; // type to de-serialize in WAVE
+    // TODO: use original projection when OGRSource supports it
+    ogr_source["dataset_id"] = concat(
+            entry.dataset_url, "/geometry.json?epsg=4326",
+            "&JWS=", json_web_token // TODO: integrate token placeholder in OgrSource
+            );
+    ogr_source["layer_id"] = "OGRGeoJSON"; // default `ogrinfo` name
+    ogr_source["numeric"] = Json::arrayValue; // empty array since the db encodes everything as string
+    ogr_source["textual"] = metadata_details.get("attributes", Json::arrayValue);
+
+    Json::Value result(Json::objectValue);
+    result["ogr_source"] = ogr_source;
+
+    // ugly hack to allow querying this raster
+    user.addPermission(concat("data.ogr_source.", ogr_source["dataset_id"].asString()));
 
     return result;
 }
