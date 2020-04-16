@@ -357,7 +357,7 @@ auto Nature40Service::composeRSDBRasterMetadata(UserDB::User &user, const Catalo
         channel["datatype"] = band["datatype"];
         channel["crs"] = crs;
 
-        channel["file_name"] = concat("/vsicurl/", // required for GDAL remote driver
+        channel["file_name"] = concat("/vsicurl_streaming/", // required for GDAL remote driver
                                       entry.dataset_url,
                                       "/raster.tiff?band=",
                                       band["index"].asInt(),
